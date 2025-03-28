@@ -357,10 +357,12 @@ void geoMeshGenerate() {
     int pointTag = 1;
     int curveTags[numPoints];
     double theta, x, y, Xj, Yj;
+    double X_previous = 1e-9;
+    double Y_previous = 1e-9;
     
     // Générer le contour du profil avec la transformation de Joukowski
     for (int i = 0; i < numPoints; i++) {
-        theta = 2.0 * M_PI * i / numPoints;
+        theta =  (-M_PI/2) + M_PI * i / numPoints;
         x = a * cos(theta) + epsilon;
         y = a * sin(theta);
         
@@ -368,13 +370,14 @@ void geoMeshGenerate() {
         double denom = x * x + y * y;
         Xj = x * (1 + (a * a) / denom);
         Yj = y * (1 - (a * a) / denom);
-        double X_previous = 1e-9;
-        double Y_previous = 1e-9;
-
-        if (i > 0 && fabs(Xj - X_previous) < 1e-9 || fabs(Yj - Y_previous) < 1e-9) {
-            printf("Warning: Point %d is too close to the previous point, skipping it.\n", i);
-            continue; // Ignore ce point et passe au suivant
+        /*
+        if (i != numPoints-1){
+            if (i > 0 && fabs(Xj - X_previous) < 1e-9 || fabs(Yj - Y_previous) < 1e-9) {
+                printf("Warning: Point %d is too close to the previous point, skipping it.\n", i);
+                continue; // Ignore ce point et passe au suivant
+                }
         }
+        */
 
         X_previous = Xj;
         Y_previous = Yj;
@@ -384,14 +387,16 @@ void geoMeshGenerate() {
         pointTag++; 
     }
 
+
+
     // Créer une spline entre chaque point successif
     int splineTag = 1;  // Tag pour les splines
     int splineTags[numPoints];  // Tableau des tags de splines
     for (int i = 0; i < numPoints; i++) {
         int next = (i + 1) % numPoints;  // Le dernier point est relié au premier pour fermer la courbe
-
+        int local_curveTags[2] = {curveTags[i], curveTags[next]};
         // Créer une spline entre le point i et le point suivant (next)
-        gmshModelOccAddSpline(curveTags, 2, splineTag, 0, 0, &ierr);
+        gmshModelOccAddSpline(local_curveTags, 2, splineTag, 0, 0, &ierr);
 
         // Vérifier l'absence d'erreur lors de la création de la spline
         if (ierr) {
@@ -406,35 +411,48 @@ void geoMeshGenerate() {
     }
 
     // Créer une boucle de courbes à partir des splines
-    int curveLoopTag = 1;
-    gmshModelOccAddCurveLoop(splineTags, numPoints, curveLoopTag, &ierr);
-
+    int curveLoopTag;
+    //gmshModelOccAddCurveLoop(splineTags, numPoints-1, curveLoopTag, &ierr);
+    gmshModelOccSynchronize(&ierr);
     // Créer un wire avec la boucle de courbes
-    int wireTag = 2;
-    gmshModelOccAddWire(&curveLoopTag, 1, wireTag, 1, &ierr);
-
+    int wireTag;
+    wireTag = gmshModelOccAddWire(splineTags, numPoints, -1, 1, &ierr);
+    printf("Wire tag: %d\n", wireTag);
     // Créer une surface à partir du wire
-    int surfaceTag = 3;
-    gmshModelOccAddPlaneSurface(&wireTag, 1, surfaceTag, &ierr);
+    int surfaceTag;
+    surfaceTag = gmshModelOccAddPlaneSurface(&wireTag, 1, -1, &ierr);
 
 
     gmshModelOccSynchronize(&ierr);
+    
+    
 
     // Paramètres de maillage
     if (theGeometry->elementType == FEM_QUAD) {
         gmshOptionSetNumber("Mesh.SaveAll", 1, &ierr);
+        if (ierr) { printf("Error setting Mesh.SaveAll\n"); return; }
         gmshOptionSetNumber("Mesh.RecombineAll", 1, &ierr);
+        if (ierr) { printf("Error setting Mesh.RecombineAll\n"); return; }
         gmshOptionSetNumber("Mesh.Algorithm", 11, &ierr);
+        if (ierr) { printf("Error setting Mesh.Algorithm\n"); return; }
         gmshOptionSetNumber("Mesh.SmoothRatio", 21.5, &ierr);
+        if (ierr) { printf("Error setting Mesh.SmoothRatio\n"); return; }
         gmshOptionSetNumber("Mesh.RecombinationAlgorithm", 1.0, &ierr);
+        if (ierr) { printf("Error setting Mesh.RecombinationAlgorithm\n"); return; }
         gmshModelGeoMeshSetRecombine(2, surfaceTag, 45, &ierr);
+        if (ierr) { printf("Error setting Mesh recombine\n"); return; }
         gmshModelMeshGenerate(2, &ierr);
+        if (ierr) { printf("Error generating mesh\n"); return; }
     }
 
     if (theGeometry->elementType == FEM_TRIANGLE) {
         gmshOptionSetNumber("Mesh.SaveAll", 1, &ierr);
-        gmshModelMeshGenerate(2, &ierr);  
+        if (ierr) { printf("Error setting Mesh.SaveAll\n"); return; }
+        gmshModelMeshGenerate(2, &ierr);
+        if (ierr) { printf("Error generating mesh\n"); return; }
     }
+
+    gmshFltkRun(&ierr);
 
     return;
 }
