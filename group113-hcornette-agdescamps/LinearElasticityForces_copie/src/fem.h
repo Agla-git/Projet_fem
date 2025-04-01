@@ -16,6 +16,7 @@
 #include <math.h>
 #include <string.h>
 #include "gmshc.h"
+#include <complex.h>
 
 
 #define ErrorScan(a)   femErrorScan(a,__LINE__,__FILE__)
@@ -118,7 +119,10 @@ femGeo*             geoGetGeometry();
 double              geoSize(double x, double y);
 double              geoSizeDefault(double x, double y);
 void                geoSetSizeCallback(double (*geoSize)(double x, double y));
-void                geoMeshGenerate();
+int                 count_lines(const char *filename);
+//double            (*transform_joukovski(const char *filename, int num_lines))[2];
+double              (*transform_NACA(const char *filename, int num_lines))[2];
+void                geoMeshGenerate(const char *filename, int num_lignes);
 void                geoMeshImport();
 void                geoMeshPrint();
 void                geoMeshWrite(const char *filename);

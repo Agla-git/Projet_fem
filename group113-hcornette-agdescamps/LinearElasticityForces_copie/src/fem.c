@@ -341,7 +341,123 @@ int geoGetDomain(char *name)
             
 }
 
-void geoMeshGenerate() {
+
+int count_lines(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("Erreur d'ouverture du fichier %s\n", filename);
+        return -1;
+    }
+    /*
+    int *num_lines = malloc(sizeof(int));
+    if (!num_lines) {
+        fclose(file);
+        printf("Erreur d'allocation mémoire.\n");
+        return -1;
+    }
+    */
+
+    int num_lines = -1; //pourquoi je dois commencer à -1? 
+    char line[1024];
+
+    while (fgets(line, sizeof(line), file)) {
+        (num_lines)++;
+    }
+
+    fclose(file);
+    //num_lines--;  Enlève l'en-tête
+    return num_lines;
+}
+
+/*
+double (*transform_joukovski(const char *filename, int num_lines))[2] {
+    if (num_lines <= 1) {  // Vérifie qu'il y a au moins 2 lignes (header + 1 point)
+        printf("Fichier invalide ou vide.\n");
+        return NULL;
+    }
+
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("Erreur d'ouverture du fichier %s\n", filename);
+        return NULL;
+    }
+
+    rewind(file);  // Remettre le fichier au début
+
+    char line[1024];
+    double (*points_joukovski)[2] = malloc((num_lines) * sizeof(*points_joukovski));// pourquoi ici c'est numinles-1?
+    if (!points_joukovski) {
+        fclose(file);
+        printf("Erreur d'allocation mémoire pour points_joukovski.\n");
+        return NULL;
+    }
+    
+    // Lire l'en-tête
+    //fgets(line, sizeof(line), file); ==> je l'ai enlevé avant 
+
+    for (int i = 0; i < num_lines ; i++) {
+        if (fgets(line, sizeof(line), file)) {
+            double x, y;
+            if (sscanf(line, "%lf,%lf", &x, &y) == 2) {
+                double complex z = x + I * y;
+                double complex j_z = z + 1.0 / z;
+
+                points_joukovski[i][0] = creal(j_z);
+                points_joukovski[i][1] = cimag(j_z);
+            }
+        }
+    }
+
+    fclose(file);
+    return points_joukovski;
+}
+
+*/
+
+
+double (*transform_NACA(const char *filename, int num_lines))[2] {
+    if (num_lines <= 1) {  // Vérifie qu'il y a au moins 2 lignes (header + 1 point)
+        printf("Fichier invalide ou vide.\n");
+        return NULL;
+    }
+
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        printf("Erreur d'ouverture du fichier %s\n", filename);
+        return NULL;
+    }
+
+    rewind(file);  // Remettre le fichier au début
+
+    char line[1024];
+    double (*points_NACA)[2] = malloc((num_lines) * sizeof(*points_NACA));// pourquoi ici c'est numinles-1?
+    if (!points_NACA) {
+        fclose(file);
+        printf("Erreur d'allocation mémoire pour points_joukovski.\n");
+        return NULL;
+    }
+    
+    //Lire l'en-tête
+    fgets(line, sizeof(line), file);
+
+    for (int i = 0; i < num_lines ; i++) {
+        if (fgets(line, sizeof(line), file)) {
+            double x, y;
+            if (sscanf(line, "%lf,%lf", &x, &y) == 2) {
+                points_NACA[i][0] = x;
+                points_NACA[i][1] = y;
+            }
+        }
+    }
+
+    fclose(file);
+    return points_NACA;
+}
+
+
+
+
+void geoMeshGenerate(const char *filename, int num_lignes) {
     femGeo* theGeometry = geoGetGeometry();
 
     int ierr;
@@ -350,26 +466,47 @@ void geoMeshGenerate() {
     #endif
 
     // Paramètres du profil de Joukowski
-    double a = 1.0;  // Demi-largeur du profil
-    double epsilon = 0.04;  // Cambrure du profil
-    int numPoints = 25;  // Nombre de points pour décrire le profil
+    //double a = 1.0;  // Demi-largeur du profil
+    //double epsilon = 0.04;  // Cambrure du profil
+    //int numPoints = 25;  // Nombre de points pour décrire le profil
     
+
+    //int *numPointsFromFile = malloc(sizeof(int));
+    //int numPointsFromFile = count_lines(filename);  // Passe l'adresse de numPoints
+    //int numPointsFromFile = count_lines(filename);
+    /*
+    if (numPointsFromFile <= 1) {
+        printf("Erreur : le fichier contient trop peu de points.\n");
+        return;
+    }
+    */
+    double (*points)[2] = transform_NACA(filename, num_lignes);
     int pointTag = 1;
-    int curveTags[numPoints];
+    int curveTags[num_lignes];
     double theta, x, y, Xj, Yj;
-    double X_previous = 1e-9;
-    double Y_previous = 1e-9;
+    
+    // Vérifier si la transformation a échoué
+    if (points == NULL) {
+        printf("Erreur lors de la transformation des points.\n");
+        return;
+    }
+
     
     // Générer le contour du profil avec la transformation de Joukowski
-    for (int i = 0; i < numPoints; i++) {
-        theta =  (-M_PI/2) + M_PI * i / numPoints;
+    for (int i = 0; i < num_lignes; i++) {
+
+        Xj = points[i][0];  // Coordonnée X
+        Yj = points[i][1];  // Coordonnée Y
+        /*
+        theta =  (-M_PI/2) + M_PI * i / numPoints ;
         x = a * cos(theta) + epsilon;
         y = a * sin(theta);
         
         // Transformation de Joukowski
         double denom = x * x + y * y;
-        Xj = x * (1 + (a * a) / denom);
-        Yj = y * (1 - (a * a) / denom);
+        Xj = x * (1 + (1 / denom));
+        Yj = y * (1 - (1 / denom));
+        */
         /*
         if (i != numPoints-1){
             if (i > 0 && fabs(Xj - X_previous) < 1e-9 || fabs(Yj - Y_previous) < 1e-9) {
@@ -378,10 +515,8 @@ void geoMeshGenerate() {
                 }
         }
         */
-
-        X_previous = Xj;
-        Y_previous = Yj;
-
+        printf("Point %d: (%.6f, %.6f)\n", i, Xj, Yj);  // Afficher les coordonnées des points
+        
         gmshModelOccAddPoint(Xj, Yj, 0.0, 1e-2, pointTag, &ierr);
         curveTags[i] = pointTag;  // Stocker les tags des points
         pointTag++; 
@@ -391,12 +526,13 @@ void geoMeshGenerate() {
 
     // Créer une spline entre chaque point successif
     int splineTag = 1;  // Tag pour les splines
-    int splineTags[numPoints];  // Tableau des tags de splines
-    for (int i = 0; i < numPoints; i++) {
-        int next = (i + 1) % numPoints;  // Le dernier point est relié au premier pour fermer la courbe
+    int splineTags[num_lignes];  // Tableau des tags de splines
+    for (int i = 0; i < num_lignes; i++) {
+        int next = (i + 1) % (num_lignes);  // Le dernier point est relié au premier pour fermer la courbe
         int local_curveTags[2] = {curveTags[i], curveTags[next]};
         // Créer une spline entre le point i et le point suivant (next)
         gmshModelOccAddSpline(local_curveTags, 2, splineTag, 0, 0, &ierr);
+        printf("Spline %d: de %d à %d\n", splineTag, curveTags[i], curveTags[next]);  // Afficher les tags des splines
 
         // Vérifier l'absence d'erreur lors de la création de la spline
         if (ierr) {
@@ -406,8 +542,8 @@ void geoMeshGenerate() {
         splineTags[i] = splineTag;  // Stocker l'identifiant de la spline
         splineTag++;  // Incrémenter le tag pour la prochaine spline
 
-        printf("Point %d: (%.6f, %.6f)\n", i, Xj, Yj);  // Afficher les coordonnées des points
-        printf("Spline %d: de %d à %d\n", splineTag, curveTags[i], curveTags[next]);  // Afficher les tags des splines
+        
+        
     }
 
     // Créer une boucle de courbes à partir des splines
@@ -416,7 +552,7 @@ void geoMeshGenerate() {
     gmshModelOccSynchronize(&ierr);
     // Créer un wire avec la boucle de courbes
     int wireTag;
-    wireTag = gmshModelOccAddWire(splineTags, numPoints, -1, 1, &ierr);
+    wireTag = gmshModelOccAddWire(splineTags, num_lignes, -1, 1, &ierr);
     printf("Wire tag: %d\n", wireTag);
     // Créer une surface à partir du wire
     int surfaceTag;

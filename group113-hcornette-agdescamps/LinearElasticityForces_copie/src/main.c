@@ -24,6 +24,27 @@ int main(void)
     printf("    Y : Horizontal residuals for unconstrained equations \n");
     printf("    N : Next domain highlighted\n\n\n");
 
+    /*
+    int numPoints;  // Variable pour stocker le nombre de points
+
+    // Appeler la fonction pour transformer les points
+    double (*points)[2] = transform_joukovski(filename, &numPoints);
+
+    // Vérifier si tout s'est bien passé
+    if (points == NULL) {
+        printf("Erreur dans la transformation des points.\n");
+        return -1;
+    }
+
+    // Afficher les points transformés
+    printf("Points transformés (Re, Im) :\n");
+    for (int i = 0; i < numPoints - 1; i++) {
+        printf("Point %d: %.6f, %.6f\n", i + 1, points[i][0], points[i][1]);
+    }
+
+    // Libérer la mémoire allouée pour les points
+    free(points);
+*/
     double Lx = 1.0;
     double Ly = 1.0;
       
@@ -34,9 +55,33 @@ int main(void)
     theGeometry->LyPlate     =  Ly;     
     theGeometry->h           =  Lx * 0.075;    
     theGeometry->elementType = FEM_TRIANGLE;
-  
-    geoMeshGenerate();
+
+    const char *filename = "../NACA_points.csv";  // Vérifie l'orthographe correcte du fichier
+    
+    //int *num_lines_3 = malloc(sizeof(int));
+    int num_lines_3 = count_lines(filename);  // Passe l'adresse de numPoints
+
+    if (num_lines_3 <= 1) {
+        printf("Erreur : Pas assez de points dans le fichier.\n");
+        return 1;  // Quitter le programme en cas d'erreur
+    }
+    printf("Nombre de lignes : %d\n", num_lines_3);
+    // Récupérer le tableau de points transformés
+    double (*points_NACA)[2] = transform_NACA(filename, num_lines_3);
+
+    if (!points_NACA) {
+        printf("Erreur lors de la transformation de Joukovski.\n");
+        return 1;
+    }
+
+    // Ici, tu peux utiliser `points_joukovski` dans `geoMeshGenerate` si nécessaire
+
+    // Ne pas oublier de libérer la mémoire après utilisation
+    //free(num_lines_3);
+    
+    geoMeshGenerate(filename, num_lines_3);
     geoMeshImport();
+    free(points_NACA);
     //geoSetDomainName(3, "SurfaceDomain"); 
     //geoSetDomainName(0,"Symmetry");
     //geoSetDomainName(7,"Bottom");
