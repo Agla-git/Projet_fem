@@ -118,6 +118,7 @@ void                geoInitialize();
 femGeo*             geoGetGeometry();
 double              geoSize(double x, double y);
 double              geoSizeDefault(double x, double y);
+double              computeMeshSize(double x, double y);
 void                geoSetSizeCallback(double (*geoSize)(double x, double y));
 int                 count_lines(const char *filename);
 //double            (*transform_joukovski(const char *filename, int num_lines))[2];

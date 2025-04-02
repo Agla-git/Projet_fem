@@ -24,27 +24,7 @@ int main(void)
     printf("    Y : Horizontal residuals for unconstrained equations \n");
     printf("    N : Next domain highlighted\n\n\n");
 
-    /*
-    int numPoints;  // Variable pour stocker le nombre de points
 
-    // Appeler la fonction pour transformer les points
-    double (*points)[2] = transform_joukovski(filename, &numPoints);
-
-    // Vérifier si tout s'est bien passé
-    if (points == NULL) {
-        printf("Erreur dans la transformation des points.\n");
-        return -1;
-    }
-
-    // Afficher les points transformés
-    printf("Points transformés (Re, Im) :\n");
-    for (int i = 0; i < numPoints - 1; i++) {
-        printf("Point %d: %.6f, %.6f\n", i + 1, points[i][0], points[i][1]);
-    }
-
-    // Libérer la mémoire allouée pour les points
-    free(points);
-*/
     double Lx = 1.0;
     double Ly = 1.0;
       
@@ -55,10 +35,28 @@ int main(void)
     theGeometry->LyPlate     =  Ly;     
     theGeometry->h           =  Lx * 0.075;    
     theGeometry->elementType = FEM_TRIANGLE;
+    /*
+    double h_Min = 0.005; // Taille minimale du maillage près des trous
+    double h_Max = 0.05; // Taille maximale du maillage loin des trous==> prendre la valeur par défaut ==> appeler GeoSizeDefault
+    double d_Max = 0.1; // Distance àpd duquel on garde un maillage constant avec la valeur de h par défaut.
 
+    double rayonTrou = 0.025;  // Rayon des trous
+    double xStart = 0.2;      // Position initiale en x (à ajuster)
+    double yPos = 0.01;        // Position en y (au centre)
+
+    double holePositions[3][2];  // Tableau pour stocker les centres des trous
+
+    for (int i = 0; i < 3; i++) {
+        double xPos = xStart + i * 0.2;  // Espacement entre les trous
+        holePositions[i][0] = xPos;  // Coordonnée x du centre du trou
+        holePositions[i][1] = yPos;  // Coordonnée y du centre du trou
+    }
+
+    int numHoles = 3;
+    double computeMeshSize(double x, double y, double holePositions[][2], int numHoles, double rayonTrou, double d_Max, double h_Min, double h_Max);
+    */
     const char *filename = "../NACA_points.csv";  // Vérifie l'orthographe correcte du fichier
     
-    //int *num_lines_3 = malloc(sizeof(int));
     int num_lines_3 = count_lines(filename);  // Passe l'adresse de numPoints
 
     if (num_lines_3 <= 1) {
@@ -74,23 +72,19 @@ int main(void)
         return 1;
     }
 
-    // Ici, tu peux utiliser `points_joukovski` dans `geoMeshGenerate` si nécessaire
-
-    // Ne pas oublier de libérer la mémoire après utilisation
-    //free(num_lines_3);
     
     geoMeshGenerate(filename, num_lines_3);
     geoMeshImport();
     free(points_NACA);
-    //geoSetDomainName(3, "SurfaceDomain"); 
-    //geoSetDomainName(0,"Symmetry");
-    //geoSetDomainName(7,"Bottom");
-    //geoSetDomainName(1,"Top");
+    geoSetDomainName(0, "cercle1"); 
+    geoSetDomainName(1,"cercle2");
+    geoSetDomainName(2,"cercle3");
+
 
     for (int i = 0; i < theGeometry->nDomains; i++) {
     printf("Domain %d: %s\n", i, theGeometry->theDomains[i]->name);
     }
-
+    
 
     geoMeshWrite("../data/elasticity.txt");
     
@@ -104,9 +98,22 @@ int main(void)
     double rho = 7.85e3; 
     double g   = 9.81;
     femProblem* theProblem = femElasticityCreate(theGeometry,E,nu,rho,g,PLANAR_STRAIN);
-    //femElasticityAddBoundaryCondition(theProblem,"Symmetry",DIRICHLET_X,0.0);
-    //femElasticityAddBoundaryCondition(theProblem,"Bottom",DIRICHLET_Y,0.0);
-    //femElasticityAddBoundaryCondition(theProblem,"Top",NEUMANN_Y,-1e4);
+    femElasticityAddBoundaryCondition(theProblem,"cercle1",DIRICHLET_X,0.0);
+    femElasticityAddBoundaryCondition(theProblem,"cercle1",DIRICHLET_Y,0.0);
+    femElasticityAddBoundaryCondition(theProblem,"cercle2",DIRICHLET_X,0.0);
+    femElasticityAddBoundaryCondition(theProblem,"cercle2",DIRICHLET_Y,0.0);
+    femElasticityAddBoundaryCondition(theProblem,"cercle3",DIRICHLET_X,0.0);
+    femElasticityAddBoundaryCondition(theProblem,"cercle3",DIRICHLET_Y,0.0);
+
+    for (int i = 0; i < theGeometry->nDomains; i++) {
+        if(i%2 == 0){
+            femElasticityAddBoundaryCondition(theProblem,theGeometry->theDomains[i]->name,NEUMANN_Y,500.0);//intrados
+        }
+        if(i%2 !=0){
+            femElasticityAddBoundaryCondition(theProblem,theGeometry->theDomains[i]->name,NEUMANN_Y,-4000.0);//extrados
+        }
+    }
+
     femElasticityPrint(theProblem);
 
 //

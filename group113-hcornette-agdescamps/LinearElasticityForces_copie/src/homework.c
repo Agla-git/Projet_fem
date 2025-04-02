@@ -1,5 +1,8 @@
 #include "fem.h"
 
+//initialisation de la matrice A et du vecteur B
+double **A_copy = NULL;
+double *B_copy  = NULL;
 
 void femElasticityAssembleElements(femProblem *theProblem){
     femFullSystem  *theSystem = theProblem->system;
@@ -77,34 +80,136 @@ void femElasticityAssembleNeumann(femProblem *theProblem){
     int nLocal = 2;
     double *B  = theSystem->B;
 
+
+    //on commence par parcourir toutes les conditions définies aux limites
     for(iBnd=0; iBnd < theProblem->nBoundaryConditions; iBnd++){
         femBoundaryCondition *theCondition = theProblem->conditions[iBnd];
         femBoundaryType type = theCondition->type;
+        femDomain *domain = theCondition->domain;
         double value = theCondition->value;
 
-        //
-        // A completer :-)   
-        //
+        // Ignorer les conditions de Dirichlet (contraintes de déplacement)
+        if (type == DIRICHLET_X || type == DIRICHLET_Y) { continue; }
+        
+        int shift = (type == NEUMANN_X) ? 0 : 1;
 
+        //on parcourt toutes les arêtes du maillage
+        for(iEdge = 0; iEdge < domain->nElem; iEdge++){
+
+            //on prend l'indice de l'élément associé à l'arête
+            iElem = domain->elem[iEdge];
+
+            //on récupère les coordonnées des noeuds de l'élément
+            for(j=0; j<nLocal; j++){
+                map[j]=theEdges->elem[iElem * nLocal + j];
+                mapU[j] = 2 * map[j] + shift;
+                x[j] = theNodes->X[map[j]];
+                y[j] = theNodes->Y[map[j]];
+            }
+
+
+            double dx = x[1] - x[0];
+            double dy = y[1] - y[0];
+            double length = sqrt(dx*dx + dy*dy);    
+            double jac = length/2.0; //jacobien d'une arrête en 2d
+
+            //intégration sur l'arête (The Rule)
+            for(iInteg = 0;iInteg < theRule->n; iInteg++){
+
+                //coos du point d'intégration
+                double xsi = theRule->xsi[iInteg];
+                double weight = theRule->weight[iInteg];
+
+                femDiscretePhi(theSpace,xsi,phi);
+
+                for (int i = 0; i<theSpace->n; i++){
+                    B[mapU[i]] += phi[i] * value * jac * weight;
+                }
+            }
+        }
     }
 }
 
 
 
 double *femElasticitySolve(femProblem *theProblem){
- 
-    //       
-    // A completer :-) 
-    //  
 
-     return theProblem->soluce;
+    femFullSystem *theSystem = theProblem->system;
+    femFullSystemInit(theSystem);
+    femElasticityAssembleElements(theProblem);
+    femElasticityAssembleNeumann(theProblem);
+
+    int size = theSystem->size;
+
+
+    //on alloue la mémoire pour une matrice 
+    if(A_copy == NULL){
+        {
+            A_copy = (double **) malloc(sizeof(double *) * size);
+            for (int i = 0; i < size; i++) { 
+                A_copy[i] = (double *) malloc(sizeof(double) * size); 
+            }
+        }
+    }
+    //même chose pour B
+    if (B_copy == NULL) { 
+        B_copy = (double *) malloc(sizeof(double) * size); 
+    }
+
+    //on rempli A_copy et B_copy
+    for (int i = 0; i < size; i++) {
+        B_copy[i] = theSystem->B[i];
+        for (int j = 0; j < size; j++) {
+            A_copy[i][j] = theSystem->A[i][j];
+        }
+    }
+
+    int *theConstraineNodes = theProblem->constrainedNodes;
+    for (int i =0; i<size; i++){
+        if (theConstraineNodes[i] !=-1){
+            femFullSystemConstrain(theSystem, i, theProblem->conditions[theConstraineNodes[i]]->value);
+        }
+    }
+
+    femFullSystemEliminate(theSystem);
+    //femFullSystemPrint(theSystem);
+
+    memcpy(theProblem->soluce, theSystem->B, theSystem->size * sizeof(double));
+
+    return theProblem->soluce;
 }
 
 double * femElasticityForces(femProblem *theProblem){        
            
-    //       
-    // A completer :-) 
-    //  
+    double* residuals = theProblem->residuals;
+    double *soluce = theProblem->soluce;
+    int size = theProblem->system->size;
+
+    if(residuals==NULL){
+        residuals = (double *) malloc(sizeof(double)*size);
+    }
+
+    // résidus = 0 // Initialize residuals to zero
+    for(int i=0; i<size; i++){
+        residuals[i] = 0.0;
+    }
+
+    /*
+    Calculer les résidus: R = A * U - B
+    A et B sont la matrice de rigidité et le vecteur de charge avant 
+    l'application des conditions de Dirichlet
+    */
+
+    for (int i = 0; i < size; i++)
+    {
+        for (int j = 0; j < size; j++) { residuals[i] += A_copy[i][j] * soluce[j]; }
+        residuals[i] -= B_copy[i];
+        // residuals[i] -= B_copy[i];
+    }
+    // Free memory allocated for the copy of the stiffness matrix A and the load vector B
+    for (int i = 0; i < size; i++) { free(A_copy[i]); A_copy[i] = NULL;}
+    free(A_copy); free(B_copy);
+    A_copy = NULL; B_copy = NULL;
 
     return theProblem->residuals;
 }

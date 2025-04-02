@@ -15,11 +15,65 @@ femGeo *geoGetGeometry()                        { return &theGeometry; }
 
 double geoSizeDefault(double x, double y)       { return theGeometry.h; }
 
+
+
+// Fonction de taille de maillage en fonction de la distance au trou le plus proche
+double computeMeshSize(double x, double y) {
+    double minDist = 1e6; // Grande valeur pour l'initialisation
+
+    // Paramètres de maillage
+    double h_Min = 0.01; // Taille minimale du maillage près des trous
+    double h_Max = geoSizeDefault(x, y) ; // Taille maximale du maillage loin des trous==> prendre la valeur par défaut ==> appeler GeoSizeDefault
+    double d_Max = 0.01; // Distance àpd duquel on garde un maillage constant avec la valeur de h par défaut. 
+
+    double rayonTrou = 0.025;  // Rayon des trous
+    double xStart = 0.2;      // Position initiale en x (à ajuster)
+    double yPos = 0.01;        // Position en y (au centre)
+
+    double holePositions[3][2];  // Tableau pour stocker les centres des trous
+
+    for (int i = 0; i < 3; i++) {
+        double xPos = xStart + i * 0.2;  // Espacement entre les trous
+        holePositions[i][0] = xPos;  // Coordonnée x du centre du trou
+        holePositions[i][1] = yPos;  // Coordonnée y du centre du trou
+    }
+
+    int numHoles = 3;
+
+
+    // Trouver la distance minimale à un trou
+    for (int i = 0; i < numHoles; i++) {
+        double dx = x - holePositions[i][0];
+        double dy = y - holePositions[i][1];
+        double dist = sqrt(dx * dx + dy * dy);
+
+        if (dist < minDist) {
+            minDist = dist;
+        }
+    }
+
+    // Empêcher le maillage dans les trous
+   // if (minDist < rayonTrou) {
+    //    return 0.0;  // On interdit le maillage ici
+   // }
+
+    // Ajuster la taille du maillage en fonction de la distance au trou
+    if (minDist > d_Max) {
+        return h_Max;  // Trop loin des trous → h reste grand
+    } else {
+        return h_Min + (h_Max - h_Min) * pow(minDist / d_Max, 2);
+    }
+}
+
+
+
 double geoGmshSize(int dim, int tag, double x, double y, double z, double lc, void *data)
                                                 { return theGeometry.geoSize(x,y);    }
+
 void geoInitialize() 
 {
     int ierr;
+    //theGeometry.geoSize = computeMeshSize;
     theGeometry.geoSize = geoSizeDefault;
     gmshInitialize(0,NULL,1,0,&ierr);                         ErrorGmsh(ierr);
     gmshModelAdd("MyGeometry",&ierr);                         ErrorGmsh(ierr);
@@ -490,7 +544,6 @@ void geoMeshGenerate(const char *filename, int num_lignes) {
         printf("Erreur lors de la transformation des points.\n");
         return;
     }
-
     
     // Générer le contour du profil avec la transformation de Joukowski
     for (int i = 0; i < num_lignes; i++) {
@@ -523,7 +576,6 @@ void geoMeshGenerate(const char *filename, int num_lignes) {
     }
 
 
-
     // Créer une spline entre chaque point successif
     int splineTag = 1;  // Tag pour les splines
     int splineTags[num_lignes];  // Tableau des tags de splines
@@ -540,10 +592,7 @@ void geoMeshGenerate(const char *filename, int num_lignes) {
         }
 
         splineTags[i] = splineTag;  // Stocker l'identifiant de la spline
-        splineTag++;  // Incrémenter le tag pour la prochaine spline
-
-        
-        
+        splineTag++;  // Incrémenter le tag pour la prochaine spline       
     }
 
     // Créer une boucle de courbes à partir des splines
@@ -560,8 +609,32 @@ void geoMeshGenerate(const char *filename, int num_lignes) {
 
 
     gmshModelOccSynchronize(&ierr);
-    
-    
+
+        // Définir les paramètres des trous
+    double rayonTrou = 0.025;  // Rayon des trous
+    double xStart = 0.2;      // Position initiale en x (à ajuster)
+    double yPos = 0.01;        // Position en y (au centre)
+
+    int holeTags[3]; // tableau qui stocke les identifiants des trous.
+    for (int i = 0; i < 3; i++) {
+        double xPos = xStart + i * 0.2;  // Espacement entre les trous
+        holeTags[i] = gmshModelOccAddDisk(xPos, yPos, 0.0, rayonTrou, rayonTrou, -1, NULL, 0, NULL, 0, &ierr);
+    }
+
+    // Convertir en format attendu pour gmshModelOccCut
+    int surfaceArray[] = {2, surfaceTag}; //surfaceTag est l’identifiant de la surface de l’aile. 
+    // la ligne ci-dessus définit la surface de l’aile comme un objet 2D à soustraire.
+    int holeArray[6];  // 2 * nombre de trous
+    //Tableau pour stocker les tags des trois trous.
+    //Chaque trou est défini par deux valeurs (type + tag), donc 6 cases (2×3 trous).
+    for (int i = 0; i < 3; i++) {
+        holeArray[2 * i] = 2;
+        holeArray[2 * i + 1] = holeTags[i];
+    }
+
+    // Soustraction des trous
+    gmshModelOccCut(surfaceArray, 2, holeArray, 6, NULL, NULL, NULL, NULL, NULL, -1, 1, 1, &ierr);
+    gmshModelOccSynchronize(&ierr);
 
     // Paramètres de maillage
     if (theGeometry->elementType == FEM_QUAD) {
