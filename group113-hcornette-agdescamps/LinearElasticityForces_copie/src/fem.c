@@ -979,6 +979,151 @@ void  femFullSystemConstrain(femFullSystem *mySystem,
     B[myNode] = myValue;
 }
 
+//bande solver//
+femBandSystem *femBandSystemCreate(int size, int band)
+{
+    femBandSystem *myBandSystem = malloc(sizeof(femBandSystem));
+    myBandSystem->B = malloc(sizeof(double)*size*(band+1));
+    myBandSystem->A = malloc(sizeof(double*)*size);        
+    myBandSystem->size = size;
+    myBandSystem->band = band;
+    myBandSystem->A[0] = myBandSystem->B + size;
+    int i;
+    for (i=1 ; i < size ; i++) 
+        myBandSystem->A[i] = myBandSystem->A[i-1] + band - 1;
+    femBandSystemInit(myBandSystem);
+    return(myBandSystem);
+}
+ 
+void femBandSystemFree(femBandSystem *myBandSystem)
+{
+    free(myBandSystem->B);
+    free(myBandSystem->A); 
+    free(myBandSystem);
+}
+ 
+void femBandSystemInit(femBandSystem *myBandSystem)
+{
+    int i;
+    int size = myBandSystem->size;
+    int band = myBandSystem->band;
+    for (i=0 ; i < size*(band+1) ; i++) 
+        myBandSystem->B[i] = 0;        
+}
+ 
+void femBandSystemPrint(femBandSystem *myBand)
+{
+    double  **A, *B;
+    int     i, j, band, size;
+    A    = myBand->A;
+    B    = myBand->B;
+    size = myBand->size;
+    band = myBand->band;
+
+    for (i=0; i < size; i++) {
+        for (j=i; j < i+band; j++)
+            if (A[i][j] == 0) printf("         ");   
+            else              printf(" %+.1e",A[i][j]);
+        printf(" :  %+.1e \n",B[i]); }
+}
+  
+void femBandSystemPrintInfos(femBandSystem *myBand)
+{
+    int size = myBand->size;
+    int band = myBand->band;
+    printf(" \n");
+    printf("    Banded Gaussian elimination \n");
+    printf("    Storage informations \n");
+    printf("    Matrix size      : %8d\n",size);
+    printf("    Matrix band      : %8d\n",band);
+    printf("    Bytes required   : %8d\n",(int)sizeof(double)*size*(band+1));     
+}
+
+
+double femBandSystemGet(femBandSystem* myBandSystem, int myRow, int myCol)
+{
+    double value = 0;
+    if (myCol >= myRow && myCol < myRow+myBandSystem->band)  value = myBandSystem->A[myRow][myCol]; 
+    return(value);
+}
+
+femIterativeSolver *femIterativeSolverCreate(int size)
+{
+    femIterativeSolver *mySolver = malloc(sizeof(femIterativeSolver));
+    mySolver->R = malloc(sizeof(double)*size*4);      
+    mySolver->D = mySolver->R + size;       
+    mySolver->S = mySolver->R + size*2;       
+    mySolver->X = mySolver->R + size*3;       
+    mySolver->size = size;
+    femIterativeSolverInit(mySolver);
+    return(mySolver);
+}
+
+void femIterativeSolverFree(femIterativeSolver *mySolver)
+{
+    free(mySolver->R);
+    free(mySolver);
+}
+
+void femIterativeSolverInit(femIterativeSolver *mySolver)
+{
+    int i;
+    mySolver->iter = 0;
+    mySolver->error = 10.0e+12;
+    for (i=0 ; i < mySolver->size*4 ; i++) 
+        mySolver->R[i] = 0;        
+}
+ 
+void femIterativeSolverPrint(femIterativeSolver *mySolver)
+{
+    double  *R;
+    int     i, size;
+    R    = mySolver->R;
+    size = mySolver->size;
+
+    for (i=0; i < size; i++) {
+        printf("%d :  %+.1e \n",i,R[i]); }
+}
+
+void femIterativeSolverPrintInfos(femIterativeSolver *mySolver)
+{
+    if (mySolver->iter == 1)     printf("\n    Iterative solver \n");
+    printf("    Iteration %4d : %14.7e\n",mySolver->iter,mySolver->error);
+}
+
+int femIterativeSolverConverged(femIterativeSolver *mySolver)
+{
+    int  testConvergence = 0;
+    if (mySolver->iter  > 3000)     testConvergence = -1;
+    if (mySolver->error < 10.0e-6)  testConvergence = 1;
+    return(testConvergence);
+}
+
+void femIterativeSolverAssemble(femIterativeSolver* mySolver, double *Aloc, double *Bloc, double *Uloc, int *map, int nLoc)
+{
+    int i,j;
+    for (i = 0; i < nLoc; i++) { 
+        int myRow = map[i];
+        mySolver->R[myRow] -= Bloc[i];
+        for(j = 0; j < nLoc; j++) {
+            mySolver->R[myRow] += Aloc[i*nLoc+j]*Uloc[j]; }}
+}
+
+
+
+double *femIterativeSolverEliminate(femIterativeSolver *mySolver)
+{
+    mySolver->iter++;
+    double error = 0.0; int i;
+    for (i=0; i < mySolver->size; i++) {
+        error += (mySolver->R[i])*(mySolver->R[i]);
+        mySolver->X[i] = -mySolver->R[i]/5.0; 
+        mySolver->R[i] = 0.0; }
+        
+    mySolver->error = sqrt(error);
+    return(mySolver->X);
+}
+
 
 femProblem *femElasticityCreate(femGeo* theGeometry, 
                   double E, double nu, double rho, double g, femElasticCase iCase)
