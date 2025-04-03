@@ -41,20 +41,20 @@ int main(void)
 
 
    
-    theGeometry->h_Max = theGeometry->h; // h_Max dépend de theGeometry.h
+    theGeometry->h_Max = theGeometry->h; 
     for (int i = 0; i < 3; i++) {
         theGeometry->holePositions[i][0] = theGeometry->xStart + i * theGeometry->espace_trous;
         theGeometry->holePositions[i][1] = theGeometry->yPos;
     }
 
 
-    const char *filename = "../NACA_points.csv";  // Vérifie l'orthographe correcte du fichier
+    const char *filename = "../NACA_points.csv";  
     
-    int num_lines_3 = count_lines(filename);  // Passe l'adresse de numPoints
+    int num_lines_3 = count_lines(filename);  
 
     if (num_lines_3 <= 1) {
         printf("Erreur : Pas assez de points dans le fichier.\n");
-        return 1;  // Quitter le programme en cas d'erreur
+        return 1;  
     }
     printf("Nombre de lignes : %d\n", num_lines_3);
     // Récupérer le tableau de points transformés
@@ -85,10 +85,15 @@ int main(void)
 //
 //  -2- Creation probleme 
 //
-    
-    double E   = 211.e9;
-    double nu  = 0.3;
-    double rho = 7.85e3; 
+    //Acier
+    //double E   = 211.e9;
+    //double nu  = 0.3;
+    //double rho = 7.85e3; 
+
+    //Aluminium
+    double E = 60.e9; 
+    double nu = 0.33; 
+    double rho = 2.7e3;
     double g   = 9.81;
     //double g   = 0;
     femProblem* theProblem = femElasticityCreate(theGeometry,E,nu,rho,g,PLANAR_STRAIN);
