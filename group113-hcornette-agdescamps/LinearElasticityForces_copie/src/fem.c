@@ -8,9 +8,6 @@
  */
 
 #include "fem.h"
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 
 femGeo theGeometry;
 
@@ -390,14 +387,6 @@ int count_lines(const char *filename) {
         printf("Erreur d'ouverture du fichier %s\n", filename);
         return -1;
     }
-    /*
-    int *num_lines = malloc(sizeof(int));
-    if (!num_lines) {
-        fclose(file);
-        printf("Erreur d'allocation mémoire.\n");
-        return -1;
-    }
-    */
 
     int num_lines = -1; //pourquoi je dois commencer à -1? 
     char line[1024];
