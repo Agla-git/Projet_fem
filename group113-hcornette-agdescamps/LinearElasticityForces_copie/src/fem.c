@@ -48,13 +48,9 @@ double computeMeshSize(double x, double y, double h_Min, double h_Max, double d_
 }
 
 
-double* mesh_size(double x, double y) {
-    double* size = malloc(sizeof(double));  // Allocation pour un seul double
-    if (size == NULL) {
-        printf("Erreur d'allocation mémoire pour 'size'.\n");
-        exit(1);  // Quitter si l'allocation échoue
-    }
-    *size = computeMeshSize(x, y, theGeometry.h_Min, theGeometry.h_Max, theGeometry.d_Max, theGeometry.rayonTrou, theGeometry.xStart, theGeometry.yPos, theGeometry.holePositions);
+double mesh_size(double x, double y) {
+    double size;
+    size = computeMeshSize(x, y, theGeometry.h_Min, theGeometry.h_Max, theGeometry.d_Max, theGeometry.rayonTrou, theGeometry.xStart, theGeometry.yPos, theGeometry.holePositions);
     return size;
 }
 
