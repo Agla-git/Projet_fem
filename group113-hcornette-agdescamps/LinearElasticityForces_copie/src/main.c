@@ -1,15 +1,6 @@
-/*
- *  main.c
- *  Library for EPL1110 : Finite Elements for dummies
- *  Elasticite lineaire plane
- *  Calcul des densités de force aux noeuds contraints
- *
- *  Copyright (C) 2024 UCL-IMMC : Vincent Legat
- *  All rights reserved.
- *
- */
- 
 #include "glfem.h"
+#include <time.h>
+
 
 double fun(double x, double y) 
 {
@@ -18,6 +9,7 @@ double fun(double x, double y)
 
 int main(void)
 {  
+    clock_t begin = clock();  // Start timing here
     printf("\n\n    V : Mesh and displacement norm \n");
     printf("    D : Domains \n");
     printf("    X : Horizontal residuals for unconstrained equations \n");
@@ -225,8 +217,10 @@ int main(void)
     geoFinalize();
     glfwTerminate(); 
     
+    clock_t end = clock();    // End timing here
+    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("Time taken: %f seconds\n", time_spent);
+    
     exit(EXIT_SUCCESS);
     return 0;  
 }
-
-
