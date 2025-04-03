@@ -6,5 +6,5 @@ C_DEFINES = -Dgraphic
 
 C_INCLUDES = -I/home/henri/Projet_fem/group113-hcornette-agdescamps/LinearElasticityForces_copie/glfw/include -I/home/henri/Projet_fem/group113-hcornette-agdescamps/LinearElasticityForces_copie/gmsh/gmsh-4.13.1-Linux64-sdk/include
 
-C_FLAGS = 
+C_FLAGS = -g
 

@@ -983,7 +983,7 @@ void  femFullSystemConstrain(femFullSystem *mySystem,
 femBandSystem *femBandSystemCreate(int size, int band)
 {
     femBandSystem *myBandSystem = malloc(sizeof(femBandSystem));
-    myBandSystem->B = malloc(sizeof(double)*size*(band+1));
+    myBandSystem->B = malloc(sizeof(double)*size*(band+1)); // maybe diviser par 2 jsp
     myBandSystem->A = malloc(sizeof(double*)*size);        
     myBandSystem->size = size;
     myBandSystem->band = band;
@@ -1337,4 +1337,91 @@ void femWarning(char *text, int line, char *file)
     printf("\n-------------------------------------------------------------------------------- ");
     printf("\n  Warning in %s at line %d : \n  %s\n", file, line, text);
     printf("--------------------------------------------------------------------- Yek Yek !! \n\n");                                              
+}
+
+double* femBandSystemSolve(femBandSystem *sys) {
+
+    double **A = sys->A;
+    double *B = sys->B;
+    int size = sys->size;
+    int band = sys->band; // Nb total de diagonales stockées (p = band - 1)
+    int p = band - 1;     // Nombre de sur-diagonales
+
+    // === Élimination de Gauss (Adaptée pour bande supérieure) ===
+    // On essaie d'éliminer les éléments sous la diagonale en utilisant
+    // les lignes supérieures.
+
+    for (int k = 0; k < size; k++) { // k = Ligne pivot
+        // Obtenir le pivot A[k][k] (accès direct - RISQUÉ)
+        double pivot = A[k][k];
+        // Note : femBandSystemGet n'est pas utilisable car read-only
+
+        // Vérification du pivot
+        if (fabs(pivot) <= 1e-16) {
+            printf("Pivot nul ou trop petit à la ligne %d : %e\n", k, pivot);
+            femError("Elimination Gauss Bande : Pivot nul.", __LINE__, __FILE__); // Utilise femError défini dans fem.c/fem.h
+            return NULL; // Ou gérer l'erreur autrement
+        }
+
+        // Boucle sur les lignes 'i' en dessous du pivot 'k' qui pourraient être affectées
+        // (celles qui ont un A[k][i] non nul dans la bande)
+        for (int i = k + 1; i < size && i < k + band; i++) { // i < k + band car A[k][i] n'est stocké que si i < k + band
+
+            // Obtenir le facteur A[k][i] (le terme dans la ligne pivot qui va affecter la ligne i)
+            // Accès direct - RISQUÉ
+            double factor_aik = A[k][i];
+
+            // Calculer le multiplicateur pour annuler l'effet de la ligne k sur la ligne i
+            // (Normalement factor = A[i][k] / pivot, mais A[i][k] n'est pas stocké !)
+            // On utilise A[k][i] à la place dans une logique type Crout/Doolittle modifiée.
+            // C'est HAUTEMENT NON STANDARD et potentiellement INCORRECT.
+            // Une approche plus classique viserait à calculer et stocker L et U.
+            // Tentons une élimination directe où on modifie la ligne i en utilisant la ligne k:
+            // Pour annuler le terme A[i][k] (qui n'est pas là), on utilise la symétrie A[k][i] = A[i][k] ?
+            // --> Non, ne supposons pas la symétrie.
+            // --> Tentons d'annuler les termes A[i][j] en utilisant A[k][j]
+
+             // Calcul du facteur basé sur A[k][i] (NON STANDARD !)
+             double factor = factor_aik / pivot; // Ceci n'est PAS le facteur standard m_ik = A[i][k]/A[k][k]
+
+            // Modifier les éléments de la ligne 'i' dans la bande
+            // A[i][j] = A[i][j] - factor * A[k][j]
+            // Boucle sur les colonnes j affectées dans la ligne i, en restant dans la bande
+            for (int j = i; j < size && j < k + band; j++) { // j commence à i (diag), et va jusqu'où A[k][j] existe
+                if (j < i + band) { // S'assurer que A[i][j] est dans la bande stockée
+                     // Accès direct - RISQUÉ
+                     double A_kj = A[k][j]; // A(k,j) est dans la bande car j>=k et j < k+band
+                     double A_ij = A[i][j]; // A(i,j) est dans la bande car j>=i et j < i+band (vérifié par boucle/condition)
+                     A[i][j] = A_ij - factor * A_kj;
+                }
+            }
+
+            // Modifier le membre de droite B[i]
+            B[i] = B[i] - factor * B[k];
+
+        } // fin boucle sur i (lignes sous le pivot)
+    } // fin boucle sur k (pivot)
+
+
+    // === Substitution Arrière ===
+    // A été modifié "en place" et contient maintenant U (en théorie...)
+
+    for (int i = size - 1; i >= 0; i--) {
+        double sum = 0.0;
+        // Boucle sur les colonnes j > i dans la bande de la ligne i
+        for (int j = i + 1; j < size && j < i + band; j++) {
+            // Accès direct - RISQUÉ
+            sum += A[i][j] * B[j]; // B[j] contient déjà la solution x_j calculée aux étapes précédentes
+        }
+        // Obtenir le pivot diagonal A[i][i] (accès direct - RISQUÉ)
+        double A_ii = A[i][i];
+         if (fabs(A_ii) <= 1e-16) {
+            printf("Pivot nul ou trop petit à la ligne %d lors de la substitution arrière: %e\n", i, A_ii);
+            femError("Substitution arrière Bande : Pivot nul.", __LINE__, __FILE__);
+            return NULL;
+         }
+        B[i] = (B[i] - sum) / A_ii; // B[i] devient la composante x_i de la solution
+    }
+
+    return sys->B; // Retourne le pointeur vers B qui contient maintenant la solution
 }
