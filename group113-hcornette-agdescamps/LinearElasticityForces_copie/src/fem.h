@@ -138,6 +138,23 @@ typedef struct {
     int iter;        
 } femIterativeSolver;
 
+// --- Structures pour RCM aka optimisation de node placement 
+
+// Pour la liste d'adjacence de chaque noeud
+typedef struct femNodeAdj {
+    int neighborIndex;        // Indice du noeud voisin
+    struct femNodeAdj *next;  // Pointeur vers le voisin suivant
+} femNodeAdj;
+
+// Pour représenter le graphe du maillage
+typedef struct {
+    int nNodes;             // Nombre total de noeuds
+    femNodeAdj **adjLists;  // Tableau de pointeurs vers les têtes des listes d'adjacence (taille nNodes)
+    int *degree;            // Tableau des degrés de chaque noeud (taille nNodes)
+} femGraph;
+
+// --- Fin Structures pour RCM ---
+
 
 
 void                geoInitialize();
