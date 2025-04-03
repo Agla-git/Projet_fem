@@ -623,6 +623,22 @@ void geoMeshGenerate(const char *filename, int num_lignes, double rayonTrou, dou
     gmshModelOccCut(surfaceArray, 2, holeArray, 6, NULL, NULL, NULL, NULL, NULL, -1, 1, 1, &ierr);
     gmshModelOccSynchronize(&ierr);
 
+    printf("Setting Gmsh optimization options...\n");
+    gmshOptionSetNumber("Mesh.Optimize", 1, &ierr); // General optimization
+    ErrorGmsh(ierr); // Check for errors after setting option
+    gmshOptionSetNumber("Mesh.OptimizeNetgen", 1, &ierr); // Use Netgen's optimizer
+    ErrorGmsh(ierr);
+
+    // Choose the mesh generation algorithm (2 for triangles)
+    if (theGeometry->elementType == FEM_TRIANGLE) {
+        gmshOptionSetNumber("Mesh.Algorithm", 8, &ierr); // Example: Delaunay + Netgen optimization
+         ErrorGmsh(ierr);
+        // ... rest of triangle setup
+        gmshModelMeshGenerate(2, &ierr);
+        ErrorGmsh(ierr);
+    }
+    
+
     // Paramètres de maillage
     if (theGeometry->elementType == FEM_QUAD) {
         gmshOptionSetNumber("Mesh.SaveAll", 1, &ierr);
