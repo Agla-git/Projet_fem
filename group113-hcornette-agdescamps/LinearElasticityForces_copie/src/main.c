@@ -68,6 +68,36 @@ int main(void)
     
     geoMeshGenerate(filename, num_lines_3,  theGeometry->rayonTrou, theGeometry->xStart, theGeometry->yPos);
     geoMeshImport();
+
+
+    // --- Renumérotation RCM ---
+    printf("Starting RCM node renumbering...\n");
+    femGraph* meshGraph = femBuildAdjacencyGraph(theGeometry->theElements, theGeometry->theEdges, theGeometry->theNodes->nNodes);
+    if (meshGraph) {
+        int startNode = femFindMinDegreeNode(meshGraph);
+        int* rcmPermutationP = femComputeRcmPermutation(meshGraph, startNode);
+        if (rcmPermutationP) {
+            int* old_to_new = femComputeOldToNewMap(rcmPermutationP, theGeometry->theNodes->nNodes);
+            if (old_to_new) {
+                femApplyNodePermutation(theGeometry, rcmPermutationP, old_to_new);
+                free(old_to_new);
+                printf("RCM renumbering applied successfully.\n");
+            } else {
+                printf("Error computing old_to_new map.\n");
+            }
+            free(rcmPermutationP);
+        } else {
+            printf("RCM permutation computation failed (check graph connectivity?).\n");
+        }
+        femFreeGraph(meshGraph); // Libérer le graphe après usage
+    } else {
+        printf("Failed to build adjacency graph.\n");
+    }
+    // --- Fin Renumérotation RCM ---
+
+
+
+
     free(points_NACA);
     geoSetDomainName(0, "cercle1"); 
     geoSetDomainName(1,"cercle2");
@@ -124,6 +154,10 @@ int main(void)
     double *theSoluce = femElasticitySolve(theProblem);
     double *theForces = femElasticityForces(theProblem);
     double area = femElasticityIntegrate(theProblem, fun);   
+
+    clock_t end = clock();    // End timing here
+    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("Time taken: %f seconds\n", time_spent);
    
 //
 //  -4- Deformation du maillage pour le plot final
@@ -222,9 +256,7 @@ int main(void)
     geoFinalize();
     glfwTerminate(); 
     
-    clock_t end = clock();    // End timing here
-    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time taken: %f seconds\n", time_spent);
+    
     
     exit(EXIT_SUCCESS);
     return 0;  

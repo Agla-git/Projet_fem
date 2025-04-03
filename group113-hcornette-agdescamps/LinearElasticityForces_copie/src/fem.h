@@ -153,6 +153,17 @@ typedef struct {
     int *degree;            // Tableau des degrés de chaque noeud (taille nNodes)
 } femGraph;
 
+
+void femApplyNodePermutation(femGeo* geometry, int* permutationP, int* old_to_new);
+int* femComputeOldToNewMap(int* permutationP, int nNodes);
+int* femComputeRcmPermutation(femGraph* graph, int startNode);
+int compareNeighbors(const void* a, const void* b);
+int femFindMinDegreeNode(femGraph* graph);
+void femFreeGraph(femGraph* graph);
+femGraph* femBuildAdjacencyGraph(femMesh* elements, femMesh* edges, int nNodes);
+void addEdge(femGraph* graph, int u, int v);
+
+
 // --- Fin Structures pour RCM ---
 
 
