@@ -121,6 +121,24 @@ typedef struct {
     femFullSystem *system;
 } femProblem;
 
+typedef struct {
+    double *B;
+    double **A;        
+    int size;
+    int band;        
+} femBandSystem;
+
+typedef struct {
+    double *R;
+    double *D;
+    double *S;
+    double *X; 
+    double error;      
+    int size;
+    int iter;        
+} femIterativeSolver;
+
+
 
 void                geoInitialize();
 femGeo*             geoGetGeometry();
@@ -179,6 +197,19 @@ void                femError(char *text, int line, char *file);
 void                femErrorScan(int test, int line, char *file);
 void                femErrorGmsh(int test, int line, char *file);
 void                femWarning(char *text, int line, char *file);
+
+femBandSystem* femBandSystemCreate(int size, int band); 
+void           femBandSystemFree(femBandSystem *myBandSystem); 
+void           femBandSystemInit(femBandSystem *myBandSystem); 
+void           femBandSystemPrint(femBandSystem *myBand); 
+void           femBandSystemPrintInfos(femBandSystem *myBand); 
+double         femBandSystemGet(femBandSystem* myBandSystem, int myRow, int myCol); 
+double*        femBandSystemSolve(femBandSystem *sys);
+
+void femIterativeSolverInit(femIterativeSolver *mySolver); 
+
+
+
 
 
 #endif
