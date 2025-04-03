@@ -585,6 +585,22 @@ void geoMeshGenerate(const char *filename, int num_lignes) {
     gmshModelOccCut(surfaceArray, 2, holeArray, 6, NULL, NULL, NULL, NULL, NULL, -1, 1, 1, &ierr);
     gmshModelOccSynchronize(&ierr);
 
+    printf("Setting Gmsh optimization options...\n");
+    gmshOptionSetNumber("Mesh.Optimize", 1, &ierr); // General optimization
+    ErrorGmsh(ierr); // Check for errors after setting option
+    gmshOptionSetNumber("Mesh.OptimizeNetgen", 1, &ierr); // Use Netgen's optimizer
+    ErrorGmsh(ierr);
+
+    // Choose the mesh generation algorithm (2 for triangles)
+    if (theGeometry->elementType == FEM_TRIANGLE) {
+        gmshOptionSetNumber("Mesh.Algorithm", 8, &ierr); // Example: Delaunay + Netgen optimization
+         ErrorGmsh(ierr);
+        // ... rest of triangle setup
+        gmshModelMeshGenerate(2, &ierr);
+        ErrorGmsh(ierr);
+    }
+    
+
     // Paramètres de maillage
     if (theGeometry->elementType == FEM_QUAD) {
         gmshOptionSetNumber("Mesh.SaveAll", 1, &ierr);
@@ -1374,3 +1390,262 @@ double* femBandSystemSolve(femBandSystem *sys) {
 
     return sys->B; // Retourne le pointeur vers B qui contient maintenant la solution
 }
+
+
+// RMC 
+
+// --- Dans fem.c ---
+
+// Fonction utilitaire pour ajouter une arête (gère la symétrie et évite doublons)
+void addEdge(femGraph* graph, int u, int v) {
+    // Vérifier si v est déjà voisin de u
+    femNodeAdj* current = graph->adjLists[u];
+    while (current != NULL) {
+        if (current->neighborIndex == v) return; // Déjà présent
+        current = current->next;
+    }
+    // Ajouter v comme voisin de u
+    femNodeAdj* newNodeU = malloc(sizeof(femNodeAdj));
+    newNodeU->neighborIndex = v;
+    newNodeU->next = graph->adjLists[u];
+    graph->adjLists[u] = newNodeU;
+    graph->degree[u]++;
+
+    // Ajouter u comme voisin de v (symétrie)
+     femNodeAdj* currentV = graph->adjLists[v];
+    while (currentV != NULL) {
+        if (currentV->neighborIndex == u) return; // Déjà présent (ne devrait pas arriver si appelé correctement)
+        currentV = currentV->next;
+    }
+    femNodeAdj* newNodeV = malloc(sizeof(femNodeAdj));
+    newNodeV->neighborIndex = u;
+    newNodeV->next = graph->adjLists[v];
+    graph->adjLists[v] = newNodeV;
+    graph->degree[v]++;
+}
+
+
+femGraph* femBuildAdjacencyGraph(femMesh* elements, femMesh* edges, int nNodes) {
+    femGraph* graph = malloc(sizeof(femGraph));
+    if (!graph) return NULL;
+    graph->nNodes = nNodes;
+    graph->adjLists = calloc(nNodes, sizeof(femNodeAdj*)); // Initialise à NULL
+    graph->degree = calloc(nNodes, sizeof(int));       // Initialise à 0
+    if (!graph->adjLists || !graph->degree) { /* free and return NULL */ }
+
+    // Parcourir les éléments (Triangles)
+    if (elements && elements->nLocalNode == 3) {
+        for (int i = 0; i < elements->nElem; ++i) {
+            int n0 = elements->elem[3 * i + 0];
+            int n1 = elements->elem[3 * i + 1];
+            int n2 = elements->elem[3 * i + 2];
+            if (n0 >= 0 && n0 < nNodes && n1 >= 0 && n1 < nNodes) addEdge(graph, n0, n1);
+            if (n1 >= 0 && n1 < nNodes && n2 >= 0 && n2 < nNodes) addEdge(graph, n1, n2);
+            if (n2 >= 0 && n2 < nNodes && n0 >= 0 && n0 < nNodes) addEdge(graph, n2, n0);
+        }
+    }
+     // Parcourir les éléments (Quads) - AJOUTER SI NECESSAIRE
+     else if (elements && elements->nLocalNode == 4) {
+         for (int i = 0; i < elements->nElem; ++i) {
+            int n0 = elements->elem[4 * i + 0];
+            int n1 = elements->elem[4 * i + 1];
+            int n2 = elements->elem[4 * i + 2];
+            int n3 = elements->elem[4 * i + 3];
+             if (n0 >= 0 && n0 < nNodes && n1 >= 0 && n1 < nNodes) addEdge(graph, n0, n1);
+             if (n1 >= 0 && n1 < nNodes && n2 >= 0 && n2 < nNodes) addEdge(graph, n1, n2);
+             if (n2 >= 0 && n2 < nNodes && n3 >= 0 && n3 < nNodes) addEdge(graph, n2, n3);
+             if (n3 >= 0 && n3 < nNodes && n0 >= 0 && n0 < nNodes) addEdge(graph, n3, n0);
+         }
+     }
+
+
+    // Optionnel : Parcourir aussi `edges` si certains noeuds connectés
+    // pourraient ne pas appartenir au même élément volumique (rare en 2D simple).
+    // En général, les éléments suffisent pour la connectivité principale.
+
+    printf("Geo     : Adjacency graph built. Max degree: ... Min degree: ...\n"); // Ajouter calcul min/max degré
+    return graph;
+}
+
+void femFreeGraph(femGraph* graph) {
+    if (!graph) return;
+    for (int i = 0; i < graph->nNodes; ++i) {
+        femNodeAdj* current = graph->adjLists[i];
+        while (current != NULL) {
+            femNodeAdj* tmp = current;
+            current = current->next;
+            free(tmp);
+        }
+    }
+    free(graph->adjLists);
+    free(graph->degree);
+    free(graph);
+}
+
+int femFindMinDegreeNode(femGraph* graph) {
+    int minDegree = graph->degree[0];
+    int minNode = 0;
+    for (int i = 1; i < graph->nNodes; ++i) {
+        if (graph->degree[i] < minDegree) {
+            minDegree = graph->degree[i];
+            minNode = i;
+        }
+    }
+    printf("Geo     : Starting RCM from node %d with degree %d\n", minNode, minDegree);
+    return minNode;
+}
+
+// Structure pour stocker un voisin et son degré (pour le tri)
+typedef struct { int index; int degree; } NeighborInfo;
+
+// Fonction de comparaison pour qsort
+int compareNeighbors(const void* a, const void* b) {
+    NeighborInfo* nA = (NeighborInfo*)a;
+    NeighborInfo* nB = (NeighborInfo*)b;
+    return nA->degree - nB->degree;
+}
+
+int* femComputeRcmPermutation(femGraph* graph, int startNode) {
+    int nNodes = graph->nNodes;
+    int* R = malloc(nNodes * sizeof(int)); // Ordre CM
+    int* visited = calloc(nNodes, sizeof(int)); // 0 = non visité, 1 = visité
+    int* queue = malloc(nNodes * sizeof(int)); // File simple (tableau)
+    int head = 0, tail = 0; // Indices pour la file
+    int r_count = 0; // Compteur pour remplir R
+
+    if (!R || !visited || !queue) { /* free and return NULL */ }
+
+    // Initialisation
+    queue[tail++] = startNode;
+    visited[startNode] = 1;
+    R[r_count++] = startNode;
+
+    // Boucle BFS
+    while (head < tail) {
+        int u = queue[head++]; // Défiler
+
+        // Collecter les voisins non visités
+        NeighborInfo neighbors[graph->degree[u]]; // Taille max possible
+        int neighbor_count = 0;
+        femNodeAdj* adj = graph->adjLists[u];
+        while (adj != NULL) {
+            int v = adj->neighborIndex;
+            if (!visited[v]) {
+                neighbors[neighbor_count].index = v;
+                neighbors[neighbor_count].degree = graph->degree[v];
+                neighbor_count++;
+                 //visited[v] = 1; // Marquer ici ou après le tri ? Marquer après tri est plus sûr.
+            }
+            adj = adj->next;
+        }
+
+        // Trier les voisins collectés par degré croissant
+        qsort(neighbors, neighbor_count, sizeof(NeighborInfo), compareNeighbors);
+
+        // Enfiler et ajouter à R les voisins triés
+        for (int i = 0; i < neighbor_count; ++i) {
+             int v = neighbors[i].index;
+             if (!visited[v]) { // Vérifier à nouveau au cas où ajouté par un autre chemin
+                visited[v] = 1;
+                if (tail < nNodes) queue[tail++] = v; else { /* Error: Queue overflow */ }
+                if (r_count < nNodes) R[r_count++] = v; else { /* Error: R overflow */ }
+             }
+        }
+    }
+
+    free(visited);
+    free(queue);
+
+    if (r_count != nNodes) {
+        // Error: Le graphe n'est peut-être pas connexe ! Gérer ce cas.
+        fprintf(stderr, "Warning: RCM might be incomplete (graph not connected?)\n");
+        // Vous pourriez devoir relancer RCM sur les composantes non visitées.
+         free(R);
+         return NULL; // Ou retourner R partiellement rempli?
+    }
+
+
+    // Inverser R pour obtenir la permutation P
+    int* P = malloc(nNodes * sizeof(int));
+    if (!P) { free(R); return NULL; }
+    for (int i = 0; i < nNodes; ++i) {
+        P[i] = R[nNodes - 1 - i];
+    }
+    free(R); // On n'a plus besoin de R
+
+    printf("Geo     : RCM permutation computed.\n");
+    return P; // Retourne P[new_index] = old_index
+}
+
+
+int* femComputeOldToNewMap(int* permutationP, int nNodes) {
+    int* old_to_new = malloc(nNodes * sizeof(int));
+    if (!old_to_new) return NULL;
+    for (int i_new = 0; i_new < nNodes; ++i_new) {
+        int i_old = permutationP[i_new];
+        if (i_old >= 0 && i_old < nNodes) { // Check bounds
+           old_to_new[i_old] = i_new;
+        } else {
+             // Error handling: invalid old index in permutation
+             free(old_to_new); return NULL;
+        }
+    }
+    return old_to_new;
+}
+
+void femApplyNodePermutation(femGeo* geometry, int* permutationP, int* old_to_new) {
+    femNodes* theNodes = geometry->theNodes;
+    int nNodes = theNodes->nNodes;
+
+    // 1. Réorganiser les coordonnées X et Y
+    double* X_old = theNodes->X;
+    double* Y_old = theNodes->Y;
+    double* X_new = malloc(nNodes * sizeof(double));
+    double* Y_new = malloc(nNodes * sizeof(double));
+    if (!X_new || !Y_new) { /* Error handling */ free(X_new); free(Y_new); return; }
+
+    for (int i_new = 0; i_new < nNodes; ++i_new) {
+        int i_old = permutationP[i_new]; // P[new] = old
+        X_new[i_new] = X_old[i_old];
+        Y_new[i_new] = Y_old[i_old];
+    }
+    theNodes->X = X_new; // Pointe vers les nouvelles données
+    theNodes->Y = Y_new;
+    free(X_old);       // Libère les anciennes données
+    free(Y_old);
+
+    // 2. Mettre à jour la connectivité des éléments (Triangles/Quads)
+    femMesh* theElements = geometry->theElements;
+    if (theElements) {
+        int nElem = theElements->nElem;
+        int nLocal = theElements->nLocalNode;
+        for (int i = 0; i < nElem * nLocal; ++i) {
+            int old_node_index = theElements->elem[i];
+             if (old_node_index >= 0 && old_node_index < nNodes) { // Check bounds
+                theElements->elem[i] = old_to_new[old_node_index];
+             } else { /* Error handling */ }
+        }
+    }
+
+    // 3. Mettre à jour la connectivité des arêtes
+    femMesh* theEdges = geometry->theEdges;
+     if (theEdges) {
+        int nElem = theEdges->nElem;
+        int nLocal = theEdges->nLocalNode; // = 2
+        for (int i = 0; i < nElem * nLocal; ++i) {
+             int old_node_index = theEdges->elem[i];
+             if (old_node_index >= 0 && old_node_index < nNodes) { // Check bounds
+                theEdges->elem[i] = old_to_new[old_node_index];
+             } else { /* Error handling */ }
+        }
+    }
+
+    // 4. Mettre à jour la connectivité des domaines (si nécessaire)
+    //    Vérifier ce que contient theDomains[i]->elem. Si ce sont des indices
+    //    d'arêtes (comme cela semble être le cas d'après geoMeshImport),
+    //    alors PAS besoin de les modifier ici car les arêtes elles-mêmes
+    //    (theEdges->elem) ont déjà été mises à jour.
+     printf("Geo     : Node permutation applied to geometry data.\n");
+
+}
+
