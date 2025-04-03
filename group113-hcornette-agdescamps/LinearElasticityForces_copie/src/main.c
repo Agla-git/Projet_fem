@@ -9,7 +9,7 @@ double fun(double x, double y)
 
 int main(void)
 {  
-    clock_t begin = clock();  // Start timing here
+    
     printf("\n\n    V : Mesh and displacement norm \n");
     printf("    D : Domains \n");
     printf("    X : Horizontal residuals for unconstrained equations \n");
@@ -68,6 +68,8 @@ int main(void)
     
     geoMeshGenerate(filename, num_lines_3,  theGeometry->rayonTrou, theGeometry->xStart, theGeometry->yPos);
     geoMeshImport();
+
+    clock_t begin = clock();  // Start timing here
 
 
     // --- Renumérotation RCM ---
