@@ -53,7 +53,7 @@ typedef struct {
 } femDomain;
 
 typedef struct {
-    double LxPlate, LyPlate;
+    //double LxPlate, LyPlate;
     double h;
     femElementType elementType;
     double (*geoSize)(double x, double y);
@@ -62,6 +62,14 @@ typedef struct {
     femMesh  *theEdges;
     int nDomains;
     femDomain **theDomains;
+    double h_Min;
+    double h_Max;
+    double d_Max;
+    double rayonTrou;
+    double xStart;
+    double yPos;
+    double espace_trous;
+    double holePositions[3][2];
 } femGeo;
 
 typedef struct {
@@ -118,12 +126,12 @@ void                geoInitialize();
 femGeo*             geoGetGeometry();
 double              geoSize(double x, double y);
 double              geoSizeDefault(double x, double y);
-double              computeMeshSize(double x, double y);
+double              computeMeshSize(double x, double y, double h_Min, double h_Max, double d_Max, double rayonTrou, double xStart, double yPos, double holePositions[3][2]);
 void                geoSetSizeCallback(double (*geoSize)(double x, double y));
 int                 count_lines(const char *filename);
 //double            (*transform_joukovski(const char *filename, int num_lines))[2];
 double              (*transform_NACA(const char *filename, int num_lines))[2];
-void                geoMeshGenerate(const char *filename, int num_lignes);
+void                geoMeshGenerate(const char *filename, int num_lignes, double rayonTrou, double xStart, double yPos);
 void                geoMeshImport();
 void                geoMeshPrint();
 void                geoMeshWrite(const char *filename);

@@ -8,6 +8,9 @@
  */
 
 #include "fem.h"
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 femGeo theGeometry;
 
@@ -17,54 +20,43 @@ double geoSizeDefault(double x, double y)       { return theGeometry.h; }
 
 
 
+double hermiteInterpolation(double x, double h_max, double h_min, double dist_interp)
+{
+    if (x >= dist_interp) return h_max;
+    if (x <= 0)           return h_min;
+
+    return (1 / (dist_interp * dist_interp)) * (h_max - h_min) * x * x * (- 2 * x / dist_interp + 3) + h_min;
+}
+
+
 // Fonction de taille de maillage en fonction de la distance au trou le plus proche
-double computeMeshSize(double x, double y) {
-    double minDist = 1e6; // Grande valeur pour l'initialisation
-
-    // Paramètres de maillage
-    double h_Min = 0.01; // Taille minimale du maillage près des trous
-    double h_Max = geoSizeDefault(x, y) ; // Taille maximale du maillage loin des trous==> prendre la valeur par défaut ==> appeler GeoSizeDefault
-    double d_Max = 0.01; // Distance àpd duquel on garde un maillage constant avec la valeur de h par défaut. 
-
-    double rayonTrou = 0.025;  // Rayon des trous
-    double xStart = 0.2;      // Position initiale en x (à ajuster)
-    double yPos = 0.01;        // Position en y (au centre)
-
-    double holePositions[3][2];  // Tableau pour stocker les centres des trous
-
+double computeMeshSize(double x, double y, double h_Min, double h_Max, double d_Max, double rayonTrou, double xStart, double yPos, double holePositions[3][2]) {
+    double minDist = 1e6; // Initialisation avec une grande valeur
+    // Trouver la distance minimale d'un point aux trous
     for (int i = 0; i < 3; i++) {
-        double xPos = xStart + i * 0.2;  // Espacement entre les trous
-        holePositions[i][0] = xPos;  // Coordonnée x du centre du trou
-        holePositions[i][1] = yPos;  // Coordonnée y du centre du trou
-    }
-
-    int numHoles = 3;
-
-
-    // Trouver la distance minimale à un trou
-    for (int i = 0; i < numHoles; i++) {
         double dx = x - holePositions[i][0];
         double dy = y - holePositions[i][1];
-        double dist = sqrt(dx * dx + dy * dy);
+        double dist = sqrt(dx * dx + dy * dy) - rayonTrou; // Distance au bord du trou
 
         if (dist < minDist) {
             minDist = dist;
         }
     }
 
-    // Empêcher le maillage dans les trous
-   // if (minDist < rayonTrou) {
-    //    return 0.0;  // On interdit le maillage ici
-   // }
-
-    // Ajuster la taille du maillage en fonction de la distance au trou
-    if (minDist > d_Max) {
-        return h_Max;  // Trop loin des trous → h reste grand
-    } else {
-        return h_Min + (h_Max - h_Min) * pow(minDist / d_Max, 2);
-    }
+    // Application de l'interpolation d'Hermite pour ajuster h
+    return hermiteInterpolation(minDist, h_Max, h_Min, d_Max);
 }
 
+
+double* mesh_size(double x, double y) {
+    double* size = malloc(sizeof(double));  // Allocation pour un seul double
+    if (size == NULL) {
+        printf("Erreur d'allocation mémoire pour 'size'.\n");
+        exit(1);  // Quitter si l'allocation échoue
+    }
+    *size = computeMeshSize(x, y, theGeometry.h_Min, theGeometry.h_Max, theGeometry.d_Max, theGeometry.rayonTrou, theGeometry.xStart, theGeometry.yPos, theGeometry.holePositions);
+    return size;
+}
 
 
 double geoGmshSize(int dim, int tag, double x, double y, double z, double lc, void *data)
@@ -73,8 +65,8 @@ double geoGmshSize(int dim, int tag, double x, double y, double z, double lc, vo
 void geoInitialize() 
 {
     int ierr;
-    //theGeometry.geoSize = computeMeshSize;
-    theGeometry.geoSize = geoSizeDefault;
+    theGeometry.geoSize = mesh_size;
+    //theGeometry.geoSize = geoSizeDefault;
     gmshInitialize(0,NULL,1,0,&ierr);                         ErrorGmsh(ierr);
     gmshModelAdd("MyGeometry",&ierr);                         ErrorGmsh(ierr);
     gmshModelMeshSetSizeCallback(geoGmshSize,NULL,&ierr);     ErrorGmsh(ierr);
@@ -511,13 +503,11 @@ double (*transform_NACA(const char *filename, int num_lines))[2] {
 
 
 
-void geoMeshGenerate(const char *filename, int num_lignes) {
+void geoMeshGenerate(const char *filename, int num_lignes, double rayonTrou, double xStart, double yPos) {
     femGeo* theGeometry = geoGetGeometry();
 
     int ierr;
-    #ifndef M_PI
-    #define M_PI 3.14159265358979323846
-    #endif
+    
 
     // Paramètres du profil de Joukowski
     //double a = 1.0;  // Demi-largeur du profil
@@ -610,11 +600,12 @@ void geoMeshGenerate(const char *filename, int num_lignes) {
 
     gmshModelOccSynchronize(&ierr);
 
-        // Définir les paramètres des trous
+    /*Définir les paramètres des trous
     double rayonTrou = 0.025;  // Rayon des trous
     double xStart = 0.2;      // Position initiale en x (à ajuster)
+    //double xStart = 0.3;
     double yPos = 0.01;        // Position en y (au centre)
-
+    */
     int holeTags[3]; // tableau qui stocke les identifiants des trous.
     for (int i = 0; i < 3; i++) {
         double xPos = xStart + i * 0.2;  // Espacement entre les trous
