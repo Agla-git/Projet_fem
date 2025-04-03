@@ -19,10 +19,16 @@ int main(void)
 
     //double Lx = 1.0;
     //double Ly = 1.0;
-      
-    geoInitialize();
-    
-    femGeo* theGeometry = geoGetGeometry();
+
+     femHole true_holes[3] = {
+    {0.2, 0.01, 0.01},  // Trou 1
+    {0.4, 0.01, 0.01},  // Trou 2
+    {0.6, 0.01, 0.01}   // Trou 3
+};
+
+   
+    geoInitialize(true_holes);
+    femGeo* theGeometry = geoGetGeometry();  
     
     //theGeometry->LxPlate     =  Lx;
     //theGeometry->LyPlate     =  Ly;     
@@ -31,23 +37,12 @@ int main(void)
 
     //Déclaration des variables globales
     theGeometry->h_Min = 0.005;
-    theGeometry->h_Max;
+    theGeometry->h_Max = theGeometry->h;
     theGeometry->d_Max = 0.1;
-    theGeometry->rayonTrou = 0.025;
-    theGeometry->xStart = 0.2;
-    theGeometry->yPos = 0.01;
-    theGeometry->espace_trous = 0.2;
-    theGeometry->holePositions[3][2];
 
 
    
-    theGeometry->h_Max = theGeometry->h; 
-    for (int i = 0; i < 3; i++) {
-        theGeometry->holePositions[i][0] = theGeometry->xStart + i * theGeometry->espace_trous;
-        theGeometry->holePositions[i][1] = theGeometry->yPos;
-    }
-
-
+    
     const char *filename = "../NACA_points.csv";  
     
     int num_lines_3 = count_lines(filename);  
@@ -66,7 +61,7 @@ int main(void)
     }
 
     
-    geoMeshGenerate(filename, num_lines_3,  theGeometry->rayonTrou, theGeometry->xStart, theGeometry->yPos);
+    geoMeshGenerate(filename, num_lines_3);
     geoMeshImport();
     free(points_NACA);
     geoSetDomainName(0, "cercle1"); 

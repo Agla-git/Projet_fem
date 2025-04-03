@@ -17,6 +17,7 @@ double geoSizeDefault(double x, double y)       { return theGeometry.h; }
 
 
 
+
 double hermiteInterpolation(double x, double h_max, double h_min, double dist_interp)
 {
     if (x >= dist_interp) return h_max;
@@ -27,27 +28,27 @@ double hermiteInterpolation(double x, double h_max, double h_min, double dist_in
 
 
 // Fonction de taille de maillage en fonction de la distance au trou le plus proche
-double computeMeshSize(double x, double y, double h_Min, double h_Max, double d_Max, double rayonTrou, double xStart, double yPos, double holePositions[3][2]) {
+double computeMeshSize(double x, double y, double h_Min, double h_Max, double d_Max) {
+    femGeo* theGeometry = geoGetGeometry();
     double minDist = 1e6; // Initialisation avec une grande valeur
     // Trouver la distance minimale d'un point aux trous
     for (int i = 0; i < 3; i++) {
-        double dx = x - holePositions[i][0];
-        double dy = y - holePositions[i][1];
-        double dist = sqrt(dx * dx + dy * dy) - rayonTrou; // Distance au bord du trou
-
+        double dx = x - theGeometry->holes[i].x_center;
+        double dy = y - theGeometry->holes[i].y_center;
+        double dist = sqrt(dx * dx + dy * dy) - theGeometry->holes[i].rayon;
+    
         if (dist < minDist) {
             minDist = dist;
         }
     }
 
-    // Application de l'interpolation d'Hermite pour ajuster h
     return hermiteInterpolation(minDist, h_Max, h_Min, d_Max);
 }
 
 
 double mesh_size(double x, double y) {
     double size;
-    size = computeMeshSize(x, y, theGeometry.h_Min, theGeometry.h_Max, theGeometry.d_Max, theGeometry.rayonTrou, theGeometry.xStart, theGeometry.yPos, theGeometry.holePositions);
+    size = computeMeshSize(x, y, theGeometry.h_Min, theGeometry.h_Max, theGeometry.d_Max);
     return size;
 }
 
@@ -55,7 +56,7 @@ double mesh_size(double x, double y) {
 double geoGmshSize(int dim, int tag, double x, double y, double z, double lc, void *data)
                                                 { return theGeometry.geoSize(x,y);    }
 
-void geoInitialize() 
+void geoInitialize(femHole holes_arg [3]) 
 {
     int ierr;
     theGeometry.geoSize = mesh_size;
@@ -68,6 +69,9 @@ void geoInitialize()
     theGeometry.theEdges = NULL;
     theGeometry.nDomains = 0;
     theGeometry.theDomains = NULL;
+    for (int i = 0; i < 3; i++) {
+        theGeometry.holes[i] = holes_arg[i];
+    }
 }
 
 void geoFinalize() 
@@ -488,27 +492,11 @@ double (*transform_NACA(const char *filename, int num_lines))[2] {
 
 
 
-void geoMeshGenerate(const char *filename, int num_lignes, double rayonTrou, double xStart, double yPos) {
+void geoMeshGenerate(const char *filename, int num_lignes) {
     femGeo* theGeometry = geoGetGeometry();
 
     int ierr;
     
-
-    // Paramètres du profil de Joukowski
-    //double a = 1.0;  // Demi-largeur du profil
-    //double epsilon = 0.04;  // Cambrure du profil
-    //int numPoints = 25;  // Nombre de points pour décrire le profil
-    
-
-    //int *numPointsFromFile = malloc(sizeof(int));
-    //int numPointsFromFile = count_lines(filename);  // Passe l'adresse de numPoints
-    //int numPointsFromFile = count_lines(filename);
-    /*
-    if (numPointsFromFile <= 1) {
-        printf("Erreur : le fichier contient trop peu de points.\n");
-        return;
-    }
-    */
     double (*points)[2] = transform_NACA(filename, num_lignes);
     int pointTag = 1;
     int curveTags[num_lignes];
@@ -525,24 +513,6 @@ void geoMeshGenerate(const char *filename, int num_lignes, double rayonTrou, dou
 
         Xj = points[i][0];  // Coordonnée X
         Yj = points[i][1];  // Coordonnée Y
-        /*
-        theta =  (-M_PI/2) + M_PI * i / numPoints ;
-        x = a * cos(theta) + epsilon;
-        y = a * sin(theta);
-        
-        // Transformation de Joukowski
-        double denom = x * x + y * y;
-        Xj = x * (1 + (1 / denom));
-        Yj = y * (1 - (1 / denom));
-        */
-        /*
-        if (i != numPoints-1){
-            if (i > 0 && fabs(Xj - X_previous) < 1e-9 || fabs(Yj - Y_previous) < 1e-9) {
-                printf("Warning: Point %d is too close to the previous point, skipping it.\n", i);
-                continue; // Ignore ce point et passe au suivant
-                }
-        }
-        */
         printf("Point %d: (%.6f, %.6f)\n", i, Xj, Yj);  // Afficher les coordonnées des points
         
         gmshModelOccAddPoint(Xj, Yj, 0.0, 1e-2, pointTag, &ierr);
@@ -591,9 +561,12 @@ void geoMeshGenerate(const char *filename, int num_lignes, double rayonTrou, dou
     //double xStart = 0.3;
     double yPos = 0.01;        // Position en y (au centre)
     */
+    // Créer les trous
     int holeTags[3]; // tableau qui stocke les identifiants des trous.
     for (int i = 0; i < 3; i++) {
-        double xPos = xStart + i * 0.2;  // Espacement entre les trous
+        double xPos = theGeometry->holes[i].x_center; 
+        double yPos = theGeometry->holes[i].y_center;
+        double rayonTrou =theGeometry->holes[i].rayon;  
         holeTags[i] = gmshModelOccAddDisk(xPos, yPos, 0.0, rayonTrou, rayonTrou, -1, NULL, 0, NULL, 0, &ierr);
     }
 
