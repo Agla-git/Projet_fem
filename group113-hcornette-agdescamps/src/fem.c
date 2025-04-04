@@ -15,9 +15,6 @@ femGeo *geoGetGeometry()                        { return &theGeometry; }
 
 double geoSizeDefault(double x, double y)       { return theGeometry.h; }
 
-
-
-
 double hermiteInterpolation(double x, double h_max, double h_min, double dist_interp)
 {
     if (x >= dist_interp) return h_max;
@@ -27,11 +24,10 @@ double hermiteInterpolation(double x, double h_max, double h_min, double dist_in
 }
 
 
-// Fonction de taille de maillage en fonction de la distance au trou le plus proche
 double computeMeshSize(double x, double y, double h_Min, double h_Max, double d_Max) {
     femGeo* theGeometry = geoGetGeometry();
     double minDist = 1e6; // Initialisation avec une grande valeur
-    // Trouver la distance minimale d'un point aux trous
+
     for (int i = 0; i < 3; i++) {
         double dx = x - theGeometry->holes[i].x_center;
         double dy = y - theGeometry->holes[i].y_center;
@@ -400,54 +396,9 @@ int count_lines(const char *filename) {
     }
 
     fclose(file);
-    //num_lines--;  Enlève l'en-tête
     return num_lines;
 }
 
-/*
-double (*transform_joukovski(const char *filename, int num_lines))[2] {
-    if (num_lines <= 1) {  // Vérifie qu'il y a au moins 2 lignes (header + 1 point)
-        printf("Fichier invalide ou vide.\n");
-        return NULL;
-    }
-
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        printf("Erreur d'ouverture du fichier %s\n", filename);
-        return NULL;
-    }
-
-    rewind(file);  // Remettre le fichier au début
-
-    char line[1024];
-    double (*points_joukovski)[2] = malloc((num_lines) * sizeof(*points_joukovski));// pourquoi ici c'est numinles-1?
-    if (!points_joukovski) {
-        fclose(file);
-        printf("Erreur d'allocation mémoire pour points_joukovski.\n");
-        return NULL;
-    }
-    
-    // Lire l'en-tête
-    //fgets(line, sizeof(line), file); ==> je l'ai enlevé avant 
-
-    for (int i = 0; i < num_lines ; i++) {
-        if (fgets(line, sizeof(line), file)) {
-            double x, y;
-            if (sscanf(line, "%lf,%lf", &x, &y) == 2) {
-                double complex z = x + I * y;
-                double complex j_z = z + 1.0 / z;
-
-                points_joukovski[i][0] = creal(j_z);
-                points_joukovski[i][1] = cimag(j_z);
-            }
-        }
-    }
-
-    fclose(file);
-    return points_joukovski;
-}
-
-*/
 
 
 double (*transform_NACA(const char *filename, int num_lines))[2] {
@@ -465,7 +416,7 @@ double (*transform_NACA(const char *filename, int num_lines))[2] {
     rewind(file);  // Remettre le fichier au début
 
     char line[1024];
-    double (*points_NACA)[2] = malloc((num_lines) * sizeof(*points_NACA));// pourquoi ici c'est numinles-1?
+    double (*points_NACA)[2] = malloc((num_lines) * sizeof(*points_NACA));
     if (!points_NACA) {
         fclose(file);
         printf("Erreur d'allocation mémoire pour points_joukovski.\n");
@@ -508,7 +459,6 @@ void geoMeshGenerate(const char *filename, int num_lignes) {
         return;
     }
     
-    // Générer le contour du profil avec la transformation de Joukowski
     for (int i = 0; i < num_lignes; i++) {
 
         Xj = points[i][0];  // Coordonnée X
@@ -527,11 +477,11 @@ void geoMeshGenerate(const char *filename, int num_lignes) {
     for (int i = 0; i < num_lignes; i++) {
         int next = (i + 1) % (num_lignes);  // Le dernier point est relié au premier pour fermer la courbe
         int local_curveTags[2] = {curveTags[i], curveTags[next]};
-        // Créer une spline entre le point i et le point suivant (next)
-        gmshModelOccAddSpline(local_curveTags, 2, splineTag, 0, 0, &ierr);
-        printf("Spline %d: de %d à %d\n", splineTag, curveTags[i], curveTags[next]);  // Afficher les tags des splines
 
-        // Vérifier l'absence d'erreur lors de la création de la spline
+        gmshModelOccAddSpline(local_curveTags, 2, splineTag, 0, 0, &ierr);
+        printf("Spline %d: de %d à %d\n", splineTag, curveTags[i], curveTags[next]);  
+
+        
         if (ierr) {
             printf("Erreur lors de la création de la spline %d entre %d et %d\n", splineTag, curveTags[i], curveTags[next]);
         }
@@ -540,9 +490,6 @@ void geoMeshGenerate(const char *filename, int num_lignes) {
         splineTag++;  // Incrémenter le tag pour la prochaine spline       
     }
 
-    // Créer une boucle de courbes à partir des splines
-    int curveLoopTag;
-    //gmshModelOccAddCurveLoop(splineTags, numPoints-1, curveLoopTag, &ierr);
     gmshModelOccSynchronize(&ierr);
     // Créer un wire avec la boucle de courbes
     int wireTag;
@@ -555,12 +502,7 @@ void geoMeshGenerate(const char *filename, int num_lignes) {
 
     gmshModelOccSynchronize(&ierr);
 
-    /*Définir les paramètres des trous
-    double rayonTrou = 0.025;  // Rayon des trous
-    double xStart = 0.2;      // Position initiale en x (à ajuster)
-    //double xStart = 0.3;
-    double yPos = 0.01;        // Position en y (au centre)
-    */
+    
     // Créer les trous
     int holeTags[3]; // tableau qui stocke les identifiants des trous.
     for (int i = 0; i < 3; i++) {

@@ -8,8 +8,8 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": false,
-      "cwd": "/home/agla/Documents/Projet_fem/group113-hcornette-agdescamps/LinearElasticityForces_copie/src",
-      "program": "/home/agla/Documents/Projet_fem/group113-hcornette-agdescamps/LinearElasticityForces_copie/src/build/Debug/outDebug",
+      "cwd": "/home/agla/Documents/Projet_fem_1/group113-hcornette-agdescamps/src",
+      "program": "/home/agla/Documents/Projet_fem_1/group113-hcornette-agdescamps/src/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [

@@ -48,9 +48,12 @@ message("GMSH_LIBRARY : ${GMSH_LIBRARY}")
 include_directories(${GMSH_INCLUDE_DIR})
 
 
+
 # link the aforementioned libraries
 add_executable(${EXEC_NAME} src/fem.c src/glfem.c src/homework.c src/main.c)
 target_link_libraries(${EXEC_NAME} glfw ${OPENGL_gl_LIBRARY} ${GMSH_LIBRARY})
+
+target_compile_options(${EXEC_NAME} PRIVATE -g) #option pour débugger AHHHHHHHHHHHHHHHHHHHHHHHH
 
 if(APPLE)
     target_compile_options(${EXEC_NAME} PRIVATE "-Wdeprecated-declarations")
