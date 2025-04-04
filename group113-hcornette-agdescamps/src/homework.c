@@ -168,7 +168,7 @@ double *femElasticitySolve(femProblem *theProblem){
     int size = nTotalNodes * 2;
     int spaceDim = 2; // 2D Elasticity
 
-    printf("Using BAND SOLVER workflow\n");
+    // printf("Using BAND SOLVER workflow\n");
 
     // ===== ÉTAPE 1 : Calculer la largeur de bande MANUELLEMENT =====
     printf("Computing Bandwidth Manually...\n");
@@ -199,7 +199,7 @@ double *femElasticitySolve(femProblem *theProblem){
         return NULL;
     }
     printf("  Manually Computed Semi-Bandwidth p = %d\n", semiBandWidth_p);
-    printf("  Using bandWidth = %d for allocation (p+1)\n", bandWidth_for_alloc);
+    // printf("  Using bandWidth = %d for allocation (p+1)\n", bandWidth_for_alloc);
     // =======================================================================
 
     // ===== ÉTAPE 2 : Allouer le système BANDE =====
@@ -417,7 +417,7 @@ double *femElasticitySolve(femProblem *theProblem){
 
 
     // ===== ÉTAPE 8 : Préparer la Solution =====f
-    printf("Copying solution...\n");
+    // printf("Copying solution...\n");
     double *solution = (double*) malloc(sizeof(double) * size_system);
      if (!solution) {
         femError("Failed to allocate memory for solution copy", __LINE__, file);
@@ -431,12 +431,12 @@ double *femElasticitySolve(femProblem *theProblem){
     // ========================================
 
     // ===== ÉTAPE 9 : Libérer la mémoire (BANDE) =====
-    printf("Freeing Band System...\n");
+    // printf("Freeing Band System...\n");
     femBandSystemFree(theBandSystem);
     // ============================================
 
     // ===== ÉTAPE 10 : Retourner la Solution =====
-    printf("Band solver workflow finished.\n");
+    // printf("Band solver workflow finished.\n");
     // Retourne la copie de la solution (ou theProblem->soluce si modifié)
     return solution; // L'appelant devra free(solution)
     // Ou return theProblem->soluce; si c'est la convention

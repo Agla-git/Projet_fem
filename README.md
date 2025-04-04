@@ -17,7 +17,9 @@ The processor is used for solving problems related to linear elasticity.
 
 To build the processor, use the following command:
 
+```bash
 mkdir build && cd build && cmake .. && make && ./myFem
+```
 
 ## The solver
 

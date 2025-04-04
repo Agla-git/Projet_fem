@@ -84,7 +84,7 @@ int main(void)
 
 
     // --- Renumérotation RCM ---
-    printf("Starting RCM node renumbering...\n");
+    // printf("Starting RCM node renumbering...\n");
     femGraph* meshGraph = femBuildAdjacencyGraph(theGeometry->theElements, theGeometry->theEdges, theGeometry->theNodes->nNodes);
     if (meshGraph) {
         int startNode = femFindMinDegreeNode(meshGraph);
@@ -94,7 +94,7 @@ int main(void)
             if (old_to_new) {
                 femApplyNodePermutation(theGeometry, rcmPermutationP, old_to_new);
                 free(old_to_new);
-                printf("RCM renumbering applied successfully.\n");
+                // printf("RCM renumbering applied successfully.\n");
             } else {
                 printf("Error computing old_to_new map.\n");
             }
@@ -117,9 +117,9 @@ int main(void)
     geoSetDomainName(2,"cercle3");
 
 
-    for (int i = 0; i < theGeometry->nDomains; i++) {
-    printf("Domain %d: %s\n", i, theGeometry->theDomains[i]->name);
-    }
+    // for (int i = 0; i < theGeometry->nDomains; i++) {
+    // printf("Domain %d: %s\n", i, theGeometry->theDomains[i]->name);
+    // }
     
 
     geoMeshWrite("../data/elasticity.txt");
